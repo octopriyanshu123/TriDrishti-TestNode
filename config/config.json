@@ -1,0 +1,11 @@
+{
+  "device_path": "/dev/input/js0",
+  "namespace": "/crawle",
+  "node_name": "joy_i2w",
+  "topic": "joy",
+  "publisher_plane": "network",
+  "network_profile_file": "config/ecal-network-udp.yaml",
+  "layout": "xbox_series_x",
+  "publish_rate_hz": 50.0,
+  "telemetry_rate_hz": 1.0
+}
