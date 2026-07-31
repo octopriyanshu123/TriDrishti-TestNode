@@ -26,16 +26,6 @@ float normalize(int16_t value, float max_output)
     return (static_cast<float>(value) / 32767.0f) * max_output;
 }
 
-// void JoyCallback(const i2w::Sample<crawler_i2w_msgs::JoyMsgs> &sample) noexcept
-// {
-
-//     cmd_vel.linearVelocity = normalize(sample.value.axis0, 100);
-//     cmd_vel.angularVelocity = normalize(sample.value.axis2, 50);
-//     cmd_vel.timestamp = static_cast<std::uint64_t>(runtime().clock().now().ns);
-
-//     const auto sent = publisher_.publish(cmd_vel, static_cast<std::int64_t>(cmd_vel.timestamp));
-// }
-
 class JoyNode final : public i2w::SystemBase
 {
 public:
@@ -43,6 +33,9 @@ public:
         : i2w::SystemBase(std::move(config))
     {
     }
+
+    int linearScale = 1;
+    int angularScale = 1;
 
 private:
     i2w::LifecycleResult OnSetup()
@@ -57,11 +50,26 @@ private:
             "/joy",
             [this](const i2w::Sample<crawler_i2w_msgs::JoyMsgs> &sample)
             {
-                cmd_vel_.linearVelocity = -normalize(sample.value.axis2, 10);
-                cmd_vel_.angularVelocity = -normalize(sample.value.axis0, 5);
+
+                if(sample.value.button0){
+                    linearScale++;
+                    std::cout<<"linearScale -> "<<std::endl;
+                }
+                 if(sample.value.button3){
+                    linearScale--;
+
+                }
+                 if(sample.value.button1){
+                    angularScale++;
+                }
+                 if(sample.value.button4){
+                    angularScale--;
+                }
+                cmd_vel_.linearVelocity = -normalize(sample.value.axis2, 10*linearScale );
+                cmd_vel_.angularVelocity = -normalize(sample.value.axis0, 5*angularScale );
                 cmd_vel_.timestamp = static_cast<std::uint64_t>(runtime().clock().now().ns);
                 (void)publisher_.publish(cmd_vel_, static_cast<std::int64_t>(cmd_vel_.timestamp));
-                std::cout<<"linearVelocity -> "<<cmd_vel_.linearVelocity<<" angularVelocity -> "<<cmd_vel_.angularVelocity <<std::endl;
+                std::cout<<"linearScale -> "<<linearScale<<" angularScale -> "<<angularScale<<std::endl;
 
             },
             opts);
@@ -92,7 +100,7 @@ int main()
     i2w::Config joySubConfig;
     joySubConfig.node_name = "Joy_Sub";
     joySubConfig.ns = "robot";
-    joySubConfig.transport.network_profile_file = "/home/octo/TriDristi-ws/src/joyToCmdVel/config/config.json";
+    joySubConfig.transport.network_profile_file = "/home/octo/TriDristi-ws/src/i2w/examples/config/ecal-network-udp.yaml";
 
     JoyNode js(joySubConfig);
 

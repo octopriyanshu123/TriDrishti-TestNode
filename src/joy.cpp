@@ -43,14 +43,13 @@ public:
     explicit JoyNode(i2w::Config config)
         : i2w::SystemBase(std::move(config))
     {
-                std::cout<<"JoyNode Constructor "<<std::endl;
-
+        std::cout << "JoyNode Constructor " << std::endl;
     }
 
 private:
     i2w::LifecycleResult OnSetup()
     {
-        std::cout<<"JoyNode OnSetup "<<std::endl;
+        std::cout << "JoyNode OnSetup " << std::endl;
 
         fd_ = open(device_path_.c_str(), O_RDONLY | O_NONBLOCK);
         if (fd_ < 0)
@@ -90,7 +89,6 @@ private:
             {
                 return i2w::Ok();
             }
-
 
             std::printf("joystick read failed: %s\n", std::strerror(errno));
             return i2w::Fail();
@@ -157,10 +155,7 @@ private:
 
         joy_.timestamp = static_cast<std::uint64_t>(runtime().clock().now().ns);
         const auto sent = publisher_.publish(joy_, static_cast<std::int64_t>(joy_.timestamp));
-                        std::cout<<"Published "<<count++<<std::endl;
-
-
-    
+        std::cout << "Published " << count++ << std::endl;
 
         return true;
     }
@@ -171,23 +166,40 @@ private:
     i2w::Publisher<crawler_i2w_msgs::JoyMsgs> publisher_{};
 };
 
+#include <csignal>
+
+
 int main()
 {
 
     i2w::Config joySubConfig;
     joySubConfig.node_name = "Joy_pub";
     joySubConfig.ns = "robot";
-    joySubConfig.transport.network_profile_file = "/home/octo/TriDristi-ws/src/joyToCmdVel/config/config.json";
+
+    joySubConfig.transport.network_profile_file = "/home/octo/TriDristi-ws/src/i2w/examples/config/ecal-network-udp.yaml";
 
     JoyNode js(joySubConfig);
-
-    js.Setup();
-
-    while (running)
+    if (!js.Setup().ok)
     {
-        js.Tick();
+        std::fprintf(stderr, "myactuator_cpf_i2w setup failed\n");
+        return 2;
+    }
+
+
+    std::signal(SIGINT, Stop);
+    std::signal(SIGTERM, Stop);
+
+    while (running.load())
+    {
+        if (!js.Tick().ok)
+        {
+            std::fprintf(stderr, "myactuator_cpf_i2w tick failed\n");
+            js.Dispose();
+            return 3;
+        }
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
+    js.Dispose();
 
     return 0;
 }

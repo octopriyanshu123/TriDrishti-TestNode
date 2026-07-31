@@ -383,7 +383,7 @@ int main()
     i2w::Config joySubConfig;
     joySubConfig.node_name = "GOtoGole";
     joySubConfig.ns = "robot";
-    joySubConfig.transport.network_profile_file = "/home/octo/TriDristi-ws/src/joyToCmdVel/config/config.json";
+    joySubConfig.transport.network_profile_file = "/home/octo/TriDristi-ws/src/i2w/examples/config/config.json";
 
     GoTOGole gtg(joySubConfig);
 
