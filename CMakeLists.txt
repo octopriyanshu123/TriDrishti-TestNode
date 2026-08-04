@@ -66,3 +66,19 @@ target_link_libraries(gotoGole_node PRIVATE
 install(TARGETS gotoGole_node
   RUNTIME DESTINATION lib/${PROJECT_NAME})
 
+
+  # Chmnel Switching Client 
+  add_executable(channelSwitchingClient_node
+src/chnnelSwitchingClient.cpp
+)
+target_compile_features(channelSwitchingClient_node PRIVATE cxx_std_20)
+target_include_directories(channelSwitchingClient_node PRIVATE
+  "${CMAKE_CURRENT_SOURCE_DIR}/include")
+target_link_libraries(channelSwitchingClient_node PRIVATE
+  i2w::i2w
+  crawler_i2w_msgs::crawler_i2w_msgs
+)
+
+install(TARGETS channelSwitchingClient_node
+  RUNTIME DESTINATION lib/${PROJECT_NAME})
+
