@@ -3,16 +3,13 @@ cmake_minimum_required(VERSION 3.22)
 project(testNode LANGUAGES CXX)
 
 set(I2W_SOURCE_DIR
-    "/home/octobot/Github/TriDrishti-ws/src/i2w"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../i2w"
     CACHE PATH
     "Path to the i2w source tree")
 set(CRAWLER_I2W_MSGS_SOURCE_DIR
-    "/home/octobot/Github/TriDrishti-ws/src/crawler-i2w-msgs"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../crawler-i2w-msgs"
     CACHE PATH
     "Path to the crawler i2w message package")
-
-message(STATUS "I2W_SOURCE_DIR: ${I2W_SOURCE_DIR}")
-message(STATUS "CRAWLER_I2W_MSGS_SOURCE_DIR: ${CRAWLER_I2W_MSGS_SOURCE_DIR}")
 
 if(NOT EXISTS "${I2W_SOURCE_DIR}/CMakeLists.txt")
   message(FATAL_ERROR "i2w source not found at '${I2W_SOURCE_DIR}'")
