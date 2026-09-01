@@ -12,7 +12,7 @@
 #include <unistd.h>
 #include <iostream>
 #include <thread>
-#include <signal.h> 
+#include <signal.h>
 std::atomic_bool running{true};
 
 void Stop(int)
@@ -98,15 +98,14 @@ int main()
 {
 
     i2w::Config joySubConfig;
-    joySubConfig.node_name = "Joy_Sub";
-    joySubConfig.ns = "robot";
-    joySubConfig.transport.network_profile_file = "/home/octo/TriDristi-ws/src/i2w/examples/config/ecal-network-udp.yaml";
+    joySubConfig.node_name = "joy_cmd_vel";
+    joySubConfig.ns = "";
 
     JoyNode js(joySubConfig);
 
     js.Setup();
 
-    while (running)
+    while (running) 
     {
         js.Tick();
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
