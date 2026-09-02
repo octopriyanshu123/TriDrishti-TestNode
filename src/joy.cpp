@@ -174,9 +174,9 @@ int main()
 
     i2w::Config joySubConfig;
     joySubConfig.node_name = "Joy_pub";
-    joySubConfig.ns = "robot";
+    joySubConfig.ns = "";
 
-    joySubConfig.transport.network_profile_file = "/home/octo/TriDristi-ws/src/i2w/examples/config/ecal-network-udp.yaml";
+    // joySubConfig.transport.network_profile_file = "/home/octo/TriDristi-ws/src/i2w/examples/config/ecal-network-udp.yaml";
 
     JoyNode js(joySubConfig);
     if (!js.Setup().ok)
