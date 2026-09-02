@@ -23,10 +23,9 @@ private:
 
         options.plane = plane_;
         options.max_outstanding_calls = 16;
-        options.call_timeout_ms = 2000;
+        options.call_timeout_ms = 500;
 
-        auto client =
-            runtime().create_client<crawler_i2w_services::UiRobotConnectionCheckRequest,crawler_i2w_services::UiRobotConnectionCheckReponse>(service_name_,options);
+        auto client = runtime().create_client<crawler_i2w_services::UiRobotConnectionCheckRequest,crawler_i2w_services::UiRobotConnectionCheckReponse>(service_name_,options);
 
         if (!client)
         {
@@ -39,6 +38,7 @@ private:
         }
 
         client_ = std::move(client.value());
+        next_call_ = std::chrono::steady_clock::now() + std::chrono::seconds(1);
 
         return i2w::Ok();
     }
@@ -47,87 +47,54 @@ private:
     {
         const auto now = std::chrono::steady_clock::now();
 
-        if (now < next_call_)
+        // If we're waiting on a response and it's taken too long, mark the UI as not live.
+        if (waiting_for_response_ && now >= response_deadline_)
         {
-            return i2w::Ok();
+            waiting_for_response_ = false;
+            is_ui_live_ = false;
         }
 
-        next_call_ = now + std::chrono::milliseconds(500);
-
-        std::cout << "Input the Channel id: ";
-
-        if (!(std::cin >> deviceId))
+        // Rate-limit outgoing calls to once per second.
+        if (now >= next_call_)
         {
-            std::cerr << "Invalid channel ID\n";
+            crawler_i2w_services::UiRobotConnectionCheckRequest request;
 
-            // Clear bad input
-            std::cin.clear();
-            std::cin.ignore(
-                std::numeric_limits<std::streamsize>::max(),
-                '\n'
-            );
+            request.ping = 1;
+            request.timestamp = static_cast<std::uint64_t>(runtime().clock().now().ns);
 
-            return i2w::Fail();
-        }
-
-        crawler_i2w_services::UiRobotConnectionCheckRequest request;
-
-        request.ping = 1;
-
-        request.timestamp =
-            static_cast<std::uint64_t>(
-                runtime().clock().now().ns
-            );
-
-        // If your request has this field:
-        // request.device_id = deviceId;
-
-        const auto result =
-            client_.call(
-                request,
-                runtime().clock().now().ns,
-                [](const i2w::Sample<
-                       crawler_i2w_services::UiRobotConnectionCheckReponse
-                   >& sample)
+            const auto result = client_.call(request, runtime().clock().now().ns,
+                [this](const i2w::Sample<crawler_i2w_services::UiRobotConnectionCheckReponse>& sample)
                 {
-                    std::cout
-                        << "Response received: pong = "
-                        << static_cast<int>(sample.value.pong)
-                        << std::endl;
-                }
-            );
+                    is_ui_live_ = true;
+                    waiting_for_response_ = false;
 
-        if (!result)
-        {
-            std::printf(
-                "call failed: %s\n",
-                i2w::to_string(result.error())
-            );
+                    // std::cout << "Response received: pong = "
+                    //           << static_cast<int>(sample.value.pong)
+                    //           << std::endl;
+                });
 
-            return i2w::Fail();
+            waiting_for_response_ = true;
+            response_deadline_ = now + std::chrono::milliseconds(500);
+            next_call_ = now + std::chrono::milliseconds(500);
         }
 
-        std::cout << "Request sent for channel: "
-                  << deviceId
-                  << std::endl;
+        // Print current liveness state every tick.
+        std::cout << "UI live: " << (is_ui_live_ ? "true" : "false") << std::endl;
 
         return i2w::Ok();
     }
 
 private:
 
-    std::string service_name_{"/channel_switching_service"};
+    std::string service_name_{"/ui_robot_connection_check"};
 
     i2w::EndpointPlane plane_{i2w::EndpointPlane::Local};
 
-    i2w::Client<
-        crawler_i2w_services::UiRobotConnectionCheckRequest,
-        crawler_i2w_services::UiRobotConnectionCheckReponse
-    > client_{};
-
+    i2w::Client<crawler_i2w_services::UiRobotConnectionCheckRequest,crawler_i2w_services::UiRobotConnectionCheckReponse> client_{};
+    bool waiting_for_response_{false};
+    bool is_ui_live_{false};
     std::chrono::steady_clock::time_point next_call_{};
-
-    int deviceId{-1};
+    std::chrono::steady_clock::time_point response_deadline_{};
 };
 
 int main()
@@ -135,7 +102,7 @@ int main()
     i2w::Config config;
 
     config.node_name = "UiRobotConnectionCheck";
-    config.ns = "robot";
+    config.ns = "";
 
     UiRobotConnectionCheck node(config);
 
@@ -149,9 +116,7 @@ int main()
     {
         node.Tick();
 
-        std::this_thread::sleep_for(
-            std::chrono::milliseconds(20)
-        );
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 
     return 0;
