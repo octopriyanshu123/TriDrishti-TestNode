@@ -85,16 +85,31 @@ install(TARGETS channelSwitchingClient_node
 
 # ui Robot Connection Check
 
-add_executable(uiRobotConnectionCheck_node
-src/uiRobotConnectionCheck.cpp
+add_executable(uiRobotConnectionCheckClient_node
+src/uiRobotConnectionCheckClient.cpp
 )
-target_compile_features(uiRobotConnectionCheck_node PRIVATE cxx_std_20)
-target_include_directories(uiRobotConnectionCheck_node PRIVATE
+target_compile_features(uiRobotConnectionCheckClient_node PRIVATE cxx_std_20)
+target_include_directories(uiRobotConnectionCheckClient_node PRIVATE
   "${CMAKE_CURRENT_SOURCE_DIR}/include")
-target_link_libraries(uiRobotConnectionCheck_node PRIVATE
+target_link_libraries(uiRobotConnectionCheckClient_node PRIVATE
   i2w::i2w
   crawler_i2w_msgs::crawler_i2w_msgs
 )
 
-install(TARGETS uiRobotConnectionCheck_node
+install(TARGETS uiRobotConnectionCheckClient_node
+  RUNTIME DESTINATION lib/${PROJECT_NAME})
+
+
+  add_executable(uiRobotConnectionCheckServer_node
+src/uiRobotConnectionCheckServer.cpp
+)
+target_compile_features(uiRobotConnectionCheckServer_node PRIVATE cxx_std_20)
+target_include_directories(uiRobotConnectionCheckServer_node PRIVATE
+  "${CMAKE_CURRENT_SOURCE_DIR}/include")
+target_link_libraries(uiRobotConnectionCheckServer_node PRIVATE
+  i2w::i2w
+  crawler_i2w_msgs::crawler_i2w_msgs
+)
+
+install(TARGETS uiRobotConnectionCheckServer_node
   RUNTIME DESTINATION lib/${PROJECT_NAME})

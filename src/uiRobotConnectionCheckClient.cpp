@@ -7,10 +7,10 @@
 #include "i2w/impl.hpp"
 #include "crawler_i2w_services/uirobotconnectioncheck.hpp"
 
-class UiRobotConnectionCheck final : public i2w::SystemBase
+class UiRobotConnectionCheckClient final : public i2w::SystemBase
 {
 public:
-    explicit UiRobotConnectionCheck(i2w::Config config)
+    explicit UiRobotConnectionCheckClient(i2w::Config config)
         : i2w::SystemBase(std::move(config))
     {
     }
@@ -22,7 +22,7 @@ private:
         i2w::ServiceOptions options;
 
         options.plane = plane_;
-        options.max_outstanding_calls = 16;
+        options.max_outstanding_calls = 1;
         options.call_timeout_ms = 500;
 
         auto client = runtime().create_client<crawler_i2w_services::UiRobotConnectionCheckRequest,crawler_i2w_services::UiRobotConnectionCheckReponse>(service_name_,options);
@@ -101,10 +101,10 @@ int main()
 {
     i2w::Config config;
 
-    config.node_name = "UiRobotConnectionCheck";
+    config.node_name = "UiRobotConnectionCheckClient";
     config.ns = "";
 
-    UiRobotConnectionCheck node(config);
+    UiRobotConnectionCheckClient node(config);
 
     if (!node.Setup().ok)
     {
