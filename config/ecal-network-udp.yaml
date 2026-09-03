@@ -11,7 +11,7 @@ registration:
 transport_layer:
   udp:
     port: 14002
-    join_all_interfaces: false
+    join_all_interfaces: true
     network:
       group: "239.0.0.1"
       ttl: 3

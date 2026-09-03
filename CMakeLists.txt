@@ -113,3 +113,32 @@ target_link_libraries(uiRobotConnectionCheckServer_node PRIVATE
 
 install(TARGETS uiRobotConnectionCheckServer_node
   RUNTIME DESTINATION lib/${PROJECT_NAME})
+
+
+add_executable(joy_network_to_local_node
+src/joy_network_to_local.cpp
+)
+target_compile_features(joy_network_to_local_node PRIVATE cxx_std_20)
+target_include_directories(joy_network_to_local_node PRIVATE
+  "${CMAKE_CURRENT_SOURCE_DIR}/include")
+target_link_libraries(joy_network_to_local_node PRIVATE
+  i2w::i2w
+  crawler_i2w_msgs::crawler_i2w_msgs
+)
+
+install(TARGETS joy_network_to_local_node
+  RUNTIME DESTINATION lib/${PROJECT_NAME})
+
+add_executable(uiRobotConnectionCheckServer_network_to_local_node
+src/uiRobotConnectionCheckServer_network_to_local.cpp
+)
+target_compile_features(uiRobotConnectionCheckServer_network_to_local_node PRIVATE cxx_std_20)
+target_include_directories(uiRobotConnectionCheckServer_network_to_local_node PRIVATE
+  "${CMAKE_CURRENT_SOURCE_DIR}/include")
+target_link_libraries(uiRobotConnectionCheckServer_network_to_local_node PRIVATE
+  i2w::i2w
+  crawler_i2w_msgs::crawler_i2w_msgs
+)
+
+install(TARGETS uiRobotConnectionCheckServer_network_to_local_node
+  RUNTIME DESTINATION lib/${PROJECT_NAME})
