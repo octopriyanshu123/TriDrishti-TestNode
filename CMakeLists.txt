@@ -91,6 +91,8 @@ src/uiRobotConnectionCheckClient.cpp
 target_compile_features(uiRobotConnectionCheckClient_node PRIVATE cxx_std_20)
 target_include_directories(uiRobotConnectionCheckClient_node PRIVATE
   "${CMAKE_CURRENT_SOURCE_DIR}/include")
+target_compile_definitions(uiRobotConnectionCheckClient_node PRIVATE
+  TRIDRISHTI_TESTNODE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(uiRobotConnectionCheckClient_node PRIVATE
   i2w::i2w
   crawler_i2w_msgs::crawler_i2w_msgs

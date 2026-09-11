@@ -1,11 +1,62 @@
 #include <chrono>
+#include <csignal>
 #include <cstdio>
+#include <cstdlib>
+#include <filesystem>
 #include <iostream>
+#include <string>
 #include <thread>
 #include <utility>
 
 #include "i2w/impl.hpp"
 #include "crawler_i2w_services/uirobotconnectioncheck.hpp"
+
+namespace {
+
+constexpr const char* kLogPrefix =
+    "[node=UiRobotConnectionCheckClient][kind=service][role=client]";
+constexpr const char* kDefaultServiceName = "/robot_ui_sync/ui_robot_connection_check";
+constexpr const char* kNetworkProfileEnv = "UI_ROBOT_CONNECTION_CHECK_ECAL_CONFIG";
+
+volatile std::sig_atomic_t running = 1;
+
+void Stop(int)
+{
+    running = 0;
+}
+
+std::string resolveNetworkProfilePath()
+{
+    if (const char* env_path = std::getenv(kNetworkProfileEnv);
+        env_path != nullptr && *env_path != '\0')
+    {
+        return env_path;
+    }
+
+    const std::filesystem::path cwd_profile{"config/ecal-network-udp.yaml"};
+    if (std::filesystem::exists(cwd_profile))
+    {
+        return cwd_profile.string();
+    }
+
+#ifdef TRIDRISHTI_TESTNODE_SOURCE_DIR
+    const auto source_profile =
+        std::filesystem::path{TRIDRISHTI_TESTNODE_SOURCE_DIR} / "config/ecal-network-udp.yaml";
+    if (std::filesystem::exists(source_profile))
+    {
+        return source_profile.string();
+    }
+#endif
+
+    return cwd_profile.string();
+}
+
+const char* planeName(i2w::EndpointPlane plane) noexcept
+{
+    return plane == i2w::EndpointPlane::Network ? "network" : "local";
+}
+
+} // namespace
 
 class UiRobotConnectionCheckClient final : public i2w::SystemBase
 {
@@ -30,7 +81,10 @@ private:
         if (!client)
         {
             std::printf(
-                "create_client failed: %s\n",
+                "%s[plane=%s][name=%s] create_client_failed error=%s\n",
+                kLogPrefix,
+                planeName(plane_),
+                service_name_.c_str(),
                 i2w::to_string(client.error())
             );
 
@@ -39,6 +93,13 @@ private:
 
         client_ = std::move(client.value());
         next_call_ = std::chrono::steady_clock::now() + std::chrono::seconds(1);
+
+        std::printf(
+            "%s[plane=%s][name=%s] client_ready\n",
+            kLogPrefix,
+            planeName(plane_),
+            service_name_.c_str()
+        );
 
         return i2w::Ok();
     }
@@ -52,10 +113,15 @@ private:
         {
             waiting_for_response_ = false;
             is_ui_live_ = false;
+            std::cout << kLogPrefix
+                      << "[plane=" << planeName(plane_)
+                      << "][name=" << service_name_
+                      << "] response_timeout ui_live=false"
+                      << std::endl;
         }
 
         // Rate-limit outgoing calls to once per second.
-        if (now >= next_call_)
+        if (!waiting_for_response_ && now >= next_call_)
         {
             crawler_i2w_services::UiRobotConnectionCheckRequest request;
 
@@ -68,27 +134,51 @@ private:
                     is_ui_live_ = true;
                     waiting_for_response_ = false;
 
-                    // std::cout << "Response received: pong = "
-                    //           << static_cast<int>(sample.value.pong)
-                    //           << std::endl;
+                    std::cout << kLogPrefix
+                              << "[plane=" << planeName(plane_)
+                              << "][name=" << service_name_
+                              << "] response_received pong="
+                              << static_cast<int>(sample.value.pong)
+                              << " ui_live=true"
+                              << std::endl;
                 });
+
+            if (!result)
+            {
+                is_ui_live_ = false;
+                next_call_ = now + std::chrono::milliseconds(500);
+                std::cout << kLogPrefix
+                          << "[plane=" << planeName(plane_)
+                          << "][name=" << service_name_
+                          << "] request_submit_failed error="
+                          << i2w::to_string(result.error())
+                          << " ui_live=false"
+                          << std::endl;
+                return i2w::Ok();
+            }
 
             waiting_for_response_ = true;
             response_deadline_ = now + std::chrono::milliseconds(500);
             next_call_ = now + std::chrono::milliseconds(500);
-        }
 
-        // Print current liveness state every tick.
-        std::cout << "UI live: " << (is_ui_live_ ? "true" : "false") << std::endl;
+            std::cout << kLogPrefix
+                      << "[plane=" << planeName(plane_)
+                      << "][name=" << service_name_
+                      << "] request_sent ping="
+                      << static_cast<int>(request.ping)
+                      << " timestamp="
+                      << request.timestamp
+                      << std::endl;
+        }
 
         return i2w::Ok();
     }
 
 private:
 
-    std::string service_name_{"/ui_robot_connection_check"};
+    std::string service_name_{kDefaultServiceName};
 
-    i2w::EndpointPlane plane_{i2w::EndpointPlane::Local};
+    i2w::EndpointPlane plane_{i2w::EndpointPlane::Network};
 
     i2w::Client<crawler_i2w_services::UiRobotConnectionCheckRequest,crawler_i2w_services::UiRobotConnectionCheckReponse> client_{};
     bool waiting_for_response_{false};
@@ -103,6 +193,13 @@ int main()
 
     config.node_name = "UiRobotConnectionCheckClient";
     config.ns = "";
+    config.transport.network_profile_file = resolveNetworkProfilePath();
+
+    std::cout << kLogPrefix
+              << "[plane=network][name=" << kDefaultServiceName
+              << "] using_network_profile="
+              << config.transport.network_profile_file
+              << std::endl;
 
     UiRobotConnectionCheckClient node(config);
 
@@ -112,12 +209,21 @@ int main()
         return 1;
     }
 
-    while (true)
+    std::signal(SIGINT, Stop);
+    std::signal(SIGTERM, Stop);
+
+    while (running)
     {
-        node.Tick();
+        if (!node.Tick().ok)
+        {
+            std::cerr << "Tick failed\n";
+            node.Dispose();
+            return 2;
+        }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 
+    node.Dispose();
     return 0;
 }
