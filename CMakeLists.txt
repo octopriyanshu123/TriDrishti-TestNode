@@ -117,6 +117,13 @@ install(TARGETS uiRobotConnectionCheckServer_node
   RUNTIME DESTINATION lib/${PROJECT_NAME})
 
 
+add_executable(randomMotorState_node
+src/randomMotorState.cpp
+)
+target_compile_features(randomMotorState_node PRIVATE cxx_std_20)
+target_include_directories(randomMotorState_node PRIVATE
+  "${CMAKE_CURRENT_SOURCE_DIR}/include")
+target_link_libraries(randomMotorState_node PRIVATE
 add_executable(joy_network_to_local_node
 src/joy_network_to_local.cpp
 )
@@ -128,6 +135,32 @@ target_link_libraries(joy_network_to_local_node PRIVATE
   crawler_i2w_msgs::crawler_i2w_msgs
 )
 
+install(TARGETS randomMotorState_node
+  RUNTIME DESTINATION lib/${PROJECT_NAME})
+
+
+  
+add_executable(randomPubRcs_node
+src/randomPubRcs.cpp
+)
+target_compile_features(randomPubRcs_node PRIVATE cxx_std_20)
+target_include_directories(randomPubRcs_node PRIVATE
+  "${CMAKE_CURRENT_SOURCE_DIR}/include")
+target_link_libraries(randomPubRcs_node PRIVATE
+  i2w::i2w
+  crawler_i2w_msgs::crawler_i2w_msgs
+)
+
+install(TARGETS randomPubRcs_node
+  RUNTIME DESTINATION lib/${PROJECT_NAME})
+
+add_executable(subscriberRCSMotorState_node
+src/subscriberRCSMotorState.cpp
+)
+target_compile_features(subscriberRCSMotorState_node PRIVATE cxx_std_20)
+target_include_directories(subscriberRCSMotorState_node PRIVATE
+  "${CMAKE_CURRENT_SOURCE_DIR}/include")
+target_link_libraries(subscriberRCSMotorState_node PRIVATE
 install(TARGETS joy_network_to_local_node
   RUNTIME DESTINATION lib/${PROJECT_NAME})
 
@@ -142,5 +175,10 @@ target_link_libraries(uiRobotConnectionCheckServer_network_to_local_node PRIVATE
   crawler_i2w_msgs::crawler_i2w_msgs
 )
 
+install(TARGETS subscriberRCSMotorState_node
+  RUNTIME DESTINATION lib/${PROJECT_NAME})
+
+
+  
 install(TARGETS uiRobotConnectionCheckServer_network_to_local_node
   RUNTIME DESTINATION lib/${PROJECT_NAME})
