@@ -59,7 +59,7 @@ private:
 private:
     std::string service_name_{"/ui_robot_connection_check"};
 
-    i2w::EndpointPlane plane_{i2w::EndpointPlane::Local};
+    i2w::EndpointPlane plane_{i2w::EndpointPlane::Network};
 
     i2w::Server<crawler_i2w_services::UiRobotConnectionCheckRequest, crawler_i2w_services::UiRobotConnectionCheckReponse> server_{};
     bool waiting_for_response_{false};
@@ -74,6 +74,7 @@ int main()
 
     config.node_name = "UiRobotConnectionCheckClient";
     config.ns = "";
+    config.transport.network_profile_file = "/home/octo/Github/TriDrishti-ws/src/TriDrishti-TestNode/config/ecal-network-udp.yaml";
 
     UiRobotConnectionCheckServer node(config);
 

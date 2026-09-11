@@ -58,11 +58,13 @@ private:
             return i2w::Fail();
         }
         i2w::PublisherOptions opts;
-        opts.plane = i2w::EndpointPlane::Local;
+        opts.plane = i2w::EndpointPlane::Network;
 
         auto publisher = runtime().advertise<crawler_i2w_msgs::JoyMsgs>("/joy", opts);
 
         publisher_ = std::move(publisher.value());
+
+
         return i2w::Ok();
     }
     i2w::LifecycleResult OnTick() noexcept
@@ -71,10 +73,14 @@ private:
         while (true)
         {
             const ssize_t bytes = read(fd_, &event, sizeof(event));
+            
             if (bytes == sizeof(event))
             {
+                            std::cout<< (int)event.number<<" "<<event.value<<std::endl;
+
                 if (!PublishEvent(&event))
                 {
+                    
                     return i2w::Fail();
                 }
                 continue;
@@ -113,6 +119,7 @@ private:
         if (type == JS_EVENT_AXIS && event.number < 8 && IsDesiredAxis(event.number))
         {
             const float value = static_cast<float>(event.value);
+
             float &axis = (event.number == 0) ? joy_.axis0 : joy_.axis2;
             if (axis == value)
             {
@@ -155,7 +162,7 @@ private:
 
         joy_.timestamp = static_cast<std::uint64_t>(runtime().clock().now().ns);
         const auto sent = publisher_.publish(joy_, static_cast<std::int64_t>(joy_.timestamp));
-        std::cout << "Published " << count++ << std::endl;
+        // std::cout << "Published " << count++ << std::endl;
 
         return true;
     }
@@ -176,7 +183,7 @@ int main()
     joySubConfig.node_name = "Joy_pub";
     joySubConfig.ns = "";
 
-    // joySubConfig.transport.network_profile_file = "/home/octo/TriDristi-ws/src/i2w/examples/config/ecal-network-udp.yaml";
+    joySubConfig.transport.network_profile_file = "/home/octo/Github/TriDrishti-ws/src/TriDrishti-TestNode/config/ecal-network-udp.yaml";
 
     JoyNode js(joySubConfig);
     if (!js.Setup().ok)
