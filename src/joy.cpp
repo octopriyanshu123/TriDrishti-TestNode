@@ -17,7 +17,7 @@ namespace
 
     bool IsDesiredAxis(std::uint8_t axis)
     {
-        return axis == 0 || axis == 3;
+        return axis == 0 || axis == 4;
     }
 
     bool IsDesiredButton(std::uint8_t button)
@@ -66,6 +66,7 @@ private:
 
         return i2w::Ok();
     }
+
     i2w::LifecycleResult OnTick() noexcept
     {
         js_event event{};
@@ -80,6 +81,12 @@ private:
                 if (!PublishEvent(&event))
                 {
 
+                // Real data is flowing again; allow a future disconnect
+                // to trigger a fresh zero-state publish.
+                zero_published_ = false;
+
+                if (!PublishEvent(&event))
+                {
                     return i2w::Fail();
                 }
                 continue;
@@ -92,10 +99,24 @@ private:
 
             if (bytes == 0)
             {
+                // Clean EOF: device closed/unplugged. Treat as "released":
+                // zero everything out and publish once so subscribers
+                // don't keep acting on stale non-zero state.
+                if (!zero_published_)
+                {
+                    PublishZeroState();
+                    zero_published_ = true;
+                }
                 return i2w::Ok();
             }
 
+            // Real read error (not EAGAIN, not EOF).
             std::printf("joystick read failed: %s\n", std::strerror(errno));
+            if (!zero_published_)
+            {
+                PublishZeroState();
+                zero_published_ = true;
+            }
             return i2w::Fail();
         }
     }
@@ -119,6 +140,8 @@ private:
 
         if (type == JS_EVENT_AXIS && event.number < 8 && IsDesiredAxis(event.number))
         {
+            std::cout << (int)event.number << " " << event.value << std::endl;
+
             const float value = static_cast<float>(event.value);
 
             float &axis = (event.number == 0) ? joy_.axis0 : joy_.axis2;
@@ -131,6 +154,8 @@ private:
         else if (type == JS_EVENT_BUTTON && event.number < 12 &&
                  IsDesiredButton(event.number))
         {
+            std::cout << (int)event.number << " " << event.value << std::endl;
+
             const bool pressed = event.value != 0;
             bool *button = nullptr;
             switch (event.number)
@@ -142,10 +167,10 @@ private:
                 button = &joy_.button1;
                 break;
             case 3:
-                button = &joy_.button3;
+                button = &joy_.button4;
                 break;
             case 4:
-                button = &joy_.button4;
+                button = &joy_.button3;
                 break;
             default:
                 break;
@@ -168,8 +193,17 @@ private:
         return true;
     }
 
+    void PublishZeroState() noexcept
+    {
+        joy_ = crawler_i2w_msgs::JoyMsgs{}; // reset all axes/buttons to 0/false
+        joy_.timestamp = static_cast<std::uint64_t>(runtime().clock().now().ns);
+        std::cout << "Publish 0" << std::endl;
+        publisher_.publish(joy_, static_cast<std::int64_t>(joy_.timestamp));
+    }
+
     std::string device_path_{"/dev/input/js0"};
     int fd_{-1};
+    bool zero_published_{false};
     crawler_i2w_msgs::JoyMsgs joy_{};
     i2w::Publisher<crawler_i2w_msgs::JoyMsgs> publisher_{};
 };
