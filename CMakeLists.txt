@@ -189,3 +189,11 @@ add_test_node(
     uiRobotConnectionCheckServer_network_to_local_node
     src/uiRobotConnectionCheckServer_network_to_local.cpp
 )
+
+# Service caller
+
+
+add_test_node(
+    i2wServiceCaller_node
+    src/i2wServiceCaller.cpp
+)
