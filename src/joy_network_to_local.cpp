@@ -89,9 +89,13 @@ int main()
     i2w::Config joySubConfig;
     joySubConfig.node_name = "joy_network_to_local";
     joySubConfig.ns = "";
-    joySubConfig.transport.network_profile_file = "/home/tridrishti/tridrishti_ws/src/TriDrishti-TestNode/config/ecal-network-udp.yaml";
 
+        auto networkProfileFilePath = std::string(CONFIG_DIR) + "/ecal-network-udp.yaml";
+    
+    std::cout << "Network Profile File Path "<<networkProfileFilePath << std::endl;
 
+    joySubConfig.transport.network_profile_file = networkProfileFilePath;
+    
     JoyNode js(joySubConfig);
 
     js.Setup();

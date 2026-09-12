@@ -2,190 +2,190 @@ cmake_minimum_required(VERSION 3.22)
 
 project(testNode LANGUAGES CXX)
 
+# ============================================================
+# Dependencies
+# ============================================================
+
 set(I2W_SOURCE_DIR
     "${CMAKE_CURRENT_SOURCE_DIR}/../i2w"
     CACHE PATH
     "Path to the i2w source tree")
+
 set(CRAWLER_I2W_MSGS_SOURCE_DIR
     "${CMAKE_CURRENT_SOURCE_DIR}/../crawler-i2w-msgs"
     CACHE PATH
     "Path to the crawler i2w message package")
 
+
 if(NOT EXISTS "${I2W_SOURCE_DIR}/CMakeLists.txt")
-  message(FATAL_ERROR "i2w source not found at '${I2W_SOURCE_DIR}'")
+    message(FATAL_ERROR
+        "i2w source not found at '${I2W_SOURCE_DIR}'")
 endif()
+
 if(NOT EXISTS "${CRAWLER_I2W_MSGS_SOURCE_DIR}/CMakeLists.txt")
-  message(FATAL_ERROR
-    "crawler-i2w-msgs source not found at '${CRAWLER_I2W_MSGS_SOURCE_DIR}'")
+    message(FATAL_ERROR
+        "crawler-i2w-msgs source not found at "
+        "'${CRAWLER_I2W_MSGS_SOURCE_DIR}'")
 endif()
 
-add_subdirectory("${I2W_SOURCE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/i2w")
-add_subdirectory("${CRAWLER_I2W_MSGS_SOURCE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/crawler_i2w_msgs")
 
-add_executable(joy_sub_node
-src/joyToCmd_vel.cpp
-)
-target_compile_features(joy_sub_node PRIVATE cxx_std_20)
-target_include_directories(joy_sub_node PRIVATE
-  "${CMAKE_CURRENT_SOURCE_DIR}/include")
-target_link_libraries(joy_sub_node PRIVATE
-  i2w::i2w
-  crawler_i2w_msgs::crawler_i2w_msgs
+add_subdirectory(
+    "${I2W_SOURCE_DIR}"
+    "${CMAKE_CURRENT_BINARY_DIR}/i2w"
 )
 
-install(TARGETS joy_sub_node
-  RUNTIME DESTINATION lib/${PROJECT_NAME})
-
-  add_executable(joy_pub_node
-src/joy.cpp
-)
-target_compile_features(joy_pub_node PRIVATE cxx_std_20)
-target_include_directories(joy_pub_node PRIVATE
-  "${CMAKE_CURRENT_SOURCE_DIR}/include")
-target_link_libraries(joy_pub_node PRIVATE
-  i2w::i2w
-  crawler_i2w_msgs::crawler_i2w_msgs
+add_subdirectory(
+    "${CRAWLER_I2W_MSGS_SOURCE_DIR}"
+    "${CMAKE_CURRENT_BINARY_DIR}/crawler_i2w_msgs"
 )
 
-install(TARGETS joy_pub_node
-  RUNTIME DESTINATION lib/${PROJECT_NAME})
 
+# ============================================================
+# Common function for test nodes
+# ============================================================
 
-# Go to Gole 
-  add_executable(gotoGole_node
-src/GotoGole.cpp
-)
-target_compile_features(gotoGole_node PRIVATE cxx_std_20)
-target_include_directories(gotoGole_node PRIVATE
-  "${CMAKE_CURRENT_SOURCE_DIR}/include")
-target_link_libraries(gotoGole_node PRIVATE
-  i2w::i2w
-  crawler_i2w_msgs::crawler_i2w_msgs
-)
+function(add_test_node TARGET_NAME SOURCE_FILE)
 
-install(TARGETS gotoGole_node
-  RUNTIME DESTINATION lib/${PROJECT_NAME})
+    add_executable(${TARGET_NAME}
+        ${SOURCE_FILE}
+    )
 
+    target_compile_features(${TARGET_NAME}
+        PRIVATE
+        cxx_std_20
+    )
 
-  # Chmnel Switching Client 
-  add_executable(channelSwitchingClient_node
-src/chnnelSwitchingClient.cpp
-)
-target_compile_features(channelSwitchingClient_node PRIVATE cxx_std_20)
-target_include_directories(channelSwitchingClient_node PRIVATE
-  "${CMAKE_CURRENT_SOURCE_DIR}/include")
-target_link_libraries(channelSwitchingClient_node PRIVATE
-  i2w::i2w
-  crawler_i2w_msgs::crawler_i2w_msgs
-)
+    target_include_directories(${TARGET_NAME}
+        PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
 
-install(TARGETS channelSwitchingClient_node
-  RUNTIME DESTINATION lib/${PROJECT_NAME})
+    target_link_libraries(${TARGET_NAME}
+        PRIVATE
+        i2w::i2w
+        crawler_i2w_msgs::crawler_i2w_msgs
+    )
 
+    install(TARGETS ${TARGET_NAME}
+        RUNTIME DESTINATION lib/${PROJECT_NAME}
+    )
 
-# ui Robot Connection Check
-
-add_executable(uiRobotConnectionCheckClient_node
-src/uiRobotConnectionCheckClient.cpp
-)
-target_compile_features(uiRobotConnectionCheckClient_node PRIVATE cxx_std_20)
-target_include_directories(uiRobotConnectionCheckClient_node PRIVATE
-  "${CMAKE_CURRENT_SOURCE_DIR}/include")
-target_compile_definitions(uiRobotConnectionCheckClient_node PRIVATE
-  TRIDRISHTI_TESTNODE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
-target_link_libraries(uiRobotConnectionCheckClient_node PRIVATE
-  i2w::i2w
-  crawler_i2w_msgs::crawler_i2w_msgs
+    target_compile_definitions(${TARGET_NAME}
+    PRIVATE
+    CONFIG_DIR="${CMAKE_SOURCE_DIR}/config"
 )
 
-install(TARGETS uiRobotConnectionCheckClient_node
-  RUNTIME DESTINATION lib/${PROJECT_NAME})
+
+endfunction()
 
 
-  add_executable(uiRobotConnectionCheckServer_node
-src/uiRobotConnectionCheckServer.cpp
-)
-target_compile_features(uiRobotConnectionCheckServer_node PRIVATE cxx_std_20)
-target_include_directories(uiRobotConnectionCheckServer_node PRIVATE
-  "${CMAKE_CURRENT_SOURCE_DIR}/include")
-target_link_libraries(uiRobotConnectionCheckServer_node PRIVATE
-  i2w::i2w
-  crawler_i2w_msgs::crawler_i2w_msgs
-)
+# ============================================================
+# Executables
+# ============================================================
 
-install(TARGETS uiRobotConnectionCheckServer_node
-  RUNTIME DESTINATION lib/${PROJECT_NAME})
+# ------------------------------------------------------------
+# Joystick
+# ------------------------------------------------------------
 
-
-add_executable(randomMotorState_node
-src/randomMotorState.cpp
-)
-target_compile_features(randomMotorState_node PRIVATE cxx_std_20)
-target_include_directories(randomMotorState_node PRIVATE
-  "${CMAKE_CURRENT_SOURCE_DIR}/include")
-target_link_libraries(randomMotorState_node PRIVATE
- i2w::i2w
-  crawler_i2w_msgs::crawler_i2w_msgs
-)
-add_executable(joy_network_to_local_node
-src/joy_network_to_local.cpp
-)
-target_compile_features(joy_network_to_local_node PRIVATE cxx_std_20)
-target_include_directories(joy_network_to_local_node PRIVATE
-  "${CMAKE_CURRENT_SOURCE_DIR}/include")
-target_link_libraries(joy_network_to_local_node PRIVATE
-  i2w::i2w
-  crawler_i2w_msgs::crawler_i2w_msgs
+add_test_node(
+    joy_sub_node
+    src/joyToCmd_vel.cpp
 )
 
-install(TARGETS randomMotorState_node
-  RUNTIME DESTINATION lib/${PROJECT_NAME})
-
-
-  
-add_executable(randomPubRcs_node
-src/randomPubRcs.cpp
-)
-target_compile_features(randomPubRcs_node PRIVATE cxx_std_20)
-target_include_directories(randomPubRcs_node PRIVATE
-  "${CMAKE_CURRENT_SOURCE_DIR}/include")
-target_link_libraries(randomPubRcs_node PRIVATE
-  i2w::i2w
-  crawler_i2w_msgs::crawler_i2w_msgs
+add_test_node(
+    joy_pub_node
+    src/joy.cpp
 )
 
-install(TARGETS randomPubRcs_node
-  RUNTIME DESTINATION lib/${PROJECT_NAME})
-
-add_executable(subscriberRCSMotorState_node
-src/subscriberRCSMotorState.cpp
-)
-target_compile_features(subscriberRCSMotorState_node PRIVATE cxx_std_20)
-target_include_directories(subscriberRCSMotorState_node PRIVATE
-  "${CMAKE_CURRENT_SOURCE_DIR}/include")
-target_link_libraries(subscriberRCSMotorState_node PRIVATE
- i2w::i2w
-  crawler_i2w_msgs::crawler_i2w_msgs
-)
-install(TARGETS joy_network_to_local_node
-  RUNTIME DESTINATION lib/${PROJECT_NAME})
 
 
-add_executable(uiRobotConnectionCheckServer_network_to_local_node
-src/uiRobotConnectionCheckServer_network_to_local.cpp
-)
-target_compile_features(uiRobotConnectionCheckServer_network_to_local_node PRIVATE cxx_std_20)
-target_include_directories(uiRobotConnectionCheckServer_network_to_local_node PRIVATE
-  "${CMAKE_CURRENT_SOURCE_DIR}/include")
-target_link_libraries(uiRobotConnectionCheckServer_network_to_local_node PRIVATE
-  i2w::i2w
-  crawler_i2w_msgs::crawler_i2w_msgs
+# ------------------------------------------------------------
+# Go To Goal
+# ------------------------------------------------------------
+
+add_test_node(
+    gotoGole_node
+    src/GotoGole.cpp
 )
 
-install(TARGETS subscriberRCSMotorState_node
-  RUNTIME DESTINATION lib/${PROJECT_NAME})
+
+# ------------------------------------------------------------
+# Channel Switching
+# ------------------------------------------------------------
+
+add_test_node(
+    channelSwitchingClient_node
+    src/chnnelSwitchingClient.cpp
+)
 
 
-  
-install(TARGETS uiRobotConnectionCheckServer_network_to_local_node
-  RUNTIME DESTINATION lib/${PROJECT_NAME})
+# ------------------------------------------------------------
+# UI Robot Connection Check
+# ------------------------------------------------------------
+
+add_test_node(
+    uiRobotConnectionCheckClient_node
+    src/uiRobotConnectionCheckClient.cpp
+)
+
+target_compile_definitions(uiRobotConnectionCheckClient_node
+    PRIVATE
+    TRIDRISHTI_TESTNODE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+)
+
+
+add_test_node(
+    uiRobotConnectionCheckServer_node
+    src/uiRobotConnectionCheckServer.cpp
+)
+
+
+# ------------------------------------------------------------
+# Motor State
+# ------------------------------------------------------------
+
+add_test_node(
+    randomMotorState_node
+    src/randomMotorState.cpp
+)
+
+
+# ------------------------------------------------------------
+# Joy Network -> Local
+# ------------------------------------------------------------
+
+add_test_node(
+    joy_network_to_local_node
+    src/joy_network_to_local.cpp
+)
+
+
+# ------------------------------------------------------------
+# Random RCS Publisher
+# ------------------------------------------------------------
+
+add_test_node(
+    randomPubRcs_node
+    src/randomPubRcs.cpp
+)
+
+
+# ------------------------------------------------------------
+# RCS Motor State Subscriber
+# ------------------------------------------------------------
+
+add_test_node(
+    subscriberRCSMotorState_node
+    src/subscriberRCSMotorState.cpp
+)
+
+
+# ------------------------------------------------------------
+# UI Robot Connection Check Server
+# Network -> Local
+# ------------------------------------------------------------
+
+add_test_node(
+    uiRobotConnectionCheckServer_network_to_local_node
+    src/uiRobotConnectionCheckServer_network_to_local.cpp
+)
