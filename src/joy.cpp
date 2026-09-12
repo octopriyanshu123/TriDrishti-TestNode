@@ -64,7 +64,6 @@ private:
 
         publisher_ = std::move(publisher.value());
 
-
         return i2w::Ok();
     }
     i2w::LifecycleResult OnTick() noexcept
@@ -73,14 +72,14 @@ private:
         while (true)
         {
             const ssize_t bytes = read(fd_, &event, sizeof(event));
-            
+
             if (bytes == sizeof(event))
             {
-                            std::cout<< (int)event.number<<" "<<event.value<<std::endl;
+                std::cout << (int)event.number << " " << event.value << std::endl;
 
                 if (!PublishEvent(&event))
                 {
-                    
+
                     return i2w::Fail();
                 }
                 continue;
@@ -115,6 +114,8 @@ private:
     {
         const auto &event = *static_cast<const js_event *>(raw_event);
         const std::uint8_t type = event.type & ~JS_EVENT_INIT;
+
+        // std::cout<<(int)event.number<<" "<<event.value<<std::endl;
 
         if (type == JS_EVENT_AXIS && event.number < 8 && IsDesiredAxis(event.number))
         {
@@ -162,7 +163,7 @@ private:
 
         joy_.timestamp = static_cast<std::uint64_t>(runtime().clock().now().ns);
         const auto sent = publisher_.publish(joy_, static_cast<std::int64_t>(joy_.timestamp));
-        // std::cout << "Published " << count++ << std::endl;
+        std::cout << "Published " << count++ << std::endl;
 
         return true;
     }
@@ -175,7 +176,6 @@ private:
 
 #include <csignal>
 
-
 int main()
 {
 
@@ -183,7 +183,11 @@ int main()
     joySubConfig.node_name = "Joy_pub";
     joySubConfig.ns = "";
 
-    joySubConfig.transport.network_profile_file = "/home/octo/Github/TriDrishti-ws/src/TriDrishti-TestNode/config/ecal-network-udp.yaml";
+    auto networkProfileFilePath = std::string(CONFIG_DIR) + "/ecal-network-udp.yaml";
+    
+    std::cout << "Network Profile File Path "<<networkProfileFilePath << std::endl;
+
+    joySubConfig.transport.network_profile_file = networkProfileFilePath;
 
     JoyNode js(joySubConfig);
     if (!js.Setup().ok)
@@ -191,7 +195,6 @@ int main()
         std::fprintf(stderr, "myactuator_cpf_i2w setup failed\n");
         return 2;
     }
-
 
     std::signal(SIGINT, Stop);
     std::signal(SIGTERM, Stop);
