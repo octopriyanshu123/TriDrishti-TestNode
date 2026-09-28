@@ -43,18 +43,19 @@ private:
         }
         next_call_ = now + std::chrono::milliseconds(500);
 
-        std::cout << "Input the Chnnel id:" << std::endl;
-        std::cin >> deviceId;
+        // std::cout << "Input the Chnnel id:" << std::endl;
+        // std::cin >> deviceId;
 
         crawler_i2w_services::ChannelSwitchingRequest request;
-        request.device_id = deviceId;
+        request.device_id = 2;
 
         const auto result = client_.call(request, runtime().clock().now().ns, [](const i2w::Sample<crawler_i2w_services::ChannelSwitchingResponse> &sample)
-                                         { 
+                                        { 
                                             std::cout << "Channel Switching device_id = " << static_cast<int>(sample.value.device_id )<< std::endl; 
                                             std::cout << "Response received: result = "  <<  sample.value.result << std::endl; 
                                              std::cout <<std::endl; 
-                                            std::terminate();});
+                                            std::terminate(); 
+                                        });
 
         if (!result)
         {
@@ -76,7 +77,7 @@ int main()
 {
     i2w::Config config;
     config.node_name = "ChannelSwitchingClient";
-    config.ns = "robot";
+    config.ns = "";
 
     ChannelSwitchingClient node(config);
 
@@ -89,8 +90,8 @@ int main()
     {
         node.Tick();
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(20));
-    }    
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    }
 
     return 0;
 }
