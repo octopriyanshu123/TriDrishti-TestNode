@@ -31,13 +31,30 @@
 #include <thread>
 #include <utility>
 #include <vector>
+#include <iostream>
 
 // ---------------------------------------------------------------------------
 // Shared data between i2w callback and renderer
 // ---------------------------------------------------------------------------
 std::atomic_bool running{true};
+constexpr float kXLimit = 0.025f; // ±25 mm (x is in metres)
 
 void Stop(int) { running.store(false); }
+
+// ---------------------------------------------------------------------------
+// Edge detection: where the profile starts getting high
+// ---------------------------------------------------------------------------
+constexpr float kEdgeThreshold = 0.0005f; // 0.5 mm away from base level counts as "high"
+constexpr int kEdgeMinRun = 3;            // need >= 3 high points in a row (ignores noise)
+
+struct EdgeResult
+{
+    bool found = false;
+    float left_x = 0.0f;     // metres
+    float right_x = 0.0f;    // metres
+    float baseline_z = 0.0f; // base level (metres)
+    float height = 0.0f;     // max distance from base level (metres)
+};
 
 struct ProfilePoint
 {
@@ -74,13 +91,13 @@ private:
     i2w::LifecycleResult OnSetup()
     {
         i2w::SubscriptionOptions opts;
-        opts.plane = i2w::EndpointPlane::Local;
+        opts.plane = i2w::EndpointPlane::Network;
         opts.reliability = i2w::Reliability::BestEffort;
         opts.queue_depth = 32;
         opts.overflow_policy = i2w::OverflowPolicy::DropOldest;
 
         auto subscription = runtime().subscribe<crawler_i2w_msgs::I2wScanControlProfile>(
-            "profile",
+            "/profile",
             [](const i2w::Sample<crawler_i2w_msgs::I2wScanControlProfile> &sample)
             {
                 const auto &msg = sample.value;
@@ -124,7 +141,8 @@ void I2wThread()
 {
     i2w::Config cfg;
     cfg.node_name = "laserProflingSensor";
-    cfg.ns = "/scan_control";
+    cfg.ns = "";
+    cfg.transport.network_profile_file = "/home/octo/Github/TriDrishti-ws/src/TriDrishti-TestNode/config/ecal-network-udp.yaml";
 
     LaserProfilingSensor lps(cfg);
     lps.Setup();
@@ -153,14 +171,14 @@ struct ViewState
     double rx_hz = 0.0;
 
     // camera (metres)
-    double cx = 0.04, cz = 0.20;
+    double cx = 0.00, cz = 0.20;
     double half_x = 0.05;
 
     int win_w = 1280, win_h = 720;
-    bool autoscale = true;
+    bool autoscale = false;
     bool color_by_intensity = true;
     bool connect = false;
-    bool flip_z = false;
+    bool flip_z = true;
     bool show_invalid = false;
     bool paused = false;
     float point_size = 3.0f;
@@ -201,12 +219,24 @@ double NiceStep(double range)
     const double raw = range / 10.0;
     const double p = std::pow(10.0, std::floor(std::log10(raw)));
     const double f = raw / p;
-    const double n = f < 1.5 ? 1.0 : f < 3.0 ? 2.0 : f < 7.0 ? 5.0 : 10.0;
+    const double n = f < 1.5 ? 1.0 : f < 3.0 ? 2.0
+                                 : f < 7.0   ? 5.0
+                                             : 10.0;
     return n * p;
 }
 
-void JetColor(float t, float &r, float &g, float &b)
+void JetColor(float t, float &r, float &g, float &b, float x)
 {
+    if (x < -kXLimit || x > kXLimit)
+    {
+        r = 1.0f;
+        g = 1.0f;
+        b = 1.0f;
+        return;
+    }
+
+    // if x> 0.25 and x<0.25
+
     t = std::clamp(t, 0.0f, 1.0f);
     r = std::clamp(1.5f - std::fabs(4.0f * t - 3.0f), 0.0f, 1.0f);
     g = std::clamp(1.5f - std::fabs(4.0f * t - 2.0f), 0.0f, 1.0f);
@@ -219,12 +249,79 @@ void Shutdown()
     std::exit(0); // atexit handler joins the i2w thread
 }
 
+EdgeResult DetectEdges(const std::vector<ProfilePoint> &pts)
+{
+    EdgeResult e;
+
+    // Base level = median Z of all valid points
+    std::vector<float> zs;
+
+    zs.reserve(pts.size());
+    for (const auto &p : pts)
+        if (p.valid)
+            zs.push_back(p.z);
+    if (zs.size() < 10)
+        return e;
+    std::nth_element(zs.begin(), zs.begin() + zs.size() / 2, zs.end());
+    e.baseline_z = zs[zs.size() / 2];
+
+    // Find the longest run of consecutive "high" points
+    int best_start = -1, best_end = -1, best_len = 0;
+    int cur_start = -1, cur_end = -1, cur_len = 0;
+    
+    for (int i = 0; i < static_cast<int>(pts.size()); ++i)
+    {
+        const auto &p = pts[i];
+        if (!p.valid)
+            continue; // invalid points don't break the run
+        const bool high = std::fabs(e.baseline_z - p.z) > kEdgeThreshold;
+        if (high)
+        {
+            if (cur_len == 0)
+                cur_start = i;
+            cur_end = i;
+            ++cur_len;
+            if (cur_len > best_len)
+            {
+                best_len = cur_len;
+                best_start = cur_start;
+                best_end = cur_end;
+            }
+        }
+        else
+        {
+            cur_len = 0;
+        }
+    }
+    if (best_len < kEdgeMinRun)
+        return e;
+
+    // Left/right edge = smallest/largest X of the high run
+    e.left_x = 1e9f;
+    e.right_x = -1e9f;
+    for (int i = best_start; i <= best_end; ++i)
+    {
+        const auto &p = pts[i];
+        if (!p.valid)
+            continue;
+        const float d = std::fabs(e.baseline_z - p.z);
+        if (d <= kEdgeThreshold)
+            continue;
+        e.left_x = std::min(e.left_x, p.x);
+        e.right_x = std::max(e.right_x, p.x);
+        e.height = std::max(e.height, d);
+    }
+    e.found = true;
+    return e;
+}
+
 // ---------------------------------------------------------------------------
 // Rendering
 // ---------------------------------------------------------------------------
 void Display()
 {
     auto &v = g_view;
+    EdgeResult edges;
 
     // 1. Grab latest profile
     if (!v.paused)
@@ -338,7 +435,9 @@ void Display()
             return;
         }
         float r, g, b;
-        JetColor(p.intensity / max_i, r, g, b);
+        JetColor(p.intensity / max_i, r, g, b, p.x);
+        edges = DetectEdges(v.pts);
+
         glColor3f(r, g, b);
     };
 
@@ -380,6 +479,81 @@ void Display()
     }
     glEnd();
 
+    // 6b. Edge lines (straight vertical) + faint base level line
+    glLineWidth(2.0f);
+    glColor3f(0.0f, 1.0f, 0.0f);
+    glBegin(GL_LINES);
+    glVertex2d(0.0, v.cz - hz);
+    glVertex2d(0.0, v.cz + hz);
+    glEnd();
+
+    if (edges.found)
+    {
+        glLineWidth(2.0f);
+        glColor3f(0.0f, 0.8f, 1.0f); // cyan
+        glBegin(GL_LINES);
+        glVertex2d(edges.left_x, v.cz - hz);
+        glVertex2d(edges.left_x, v.cz + hz);
+        glVertex2d(edges.right_x, v.cz - hz);
+        glVertex2d(edges.right_x, v.cz + hz);
+        glEnd();
+
+        const double mid_x = 0.5 * (edges.left_x + edges.right_x);
+        glColor3f(1.0f, 1.0f, 0.0f);
+        glBegin(GL_LINES);
+        glVertex2d(mid_x, v.cz - hz);
+        glVertex2d(mid_x, v.cz + hz);
+        glEnd();
+
+        // Horizontal error line between green (X = 0) and yellow (middle)
+        {
+            const double mid_x = 0.5 * (edges.left_x + edges.right_x);
+            const double error_mm = std::fabs(mid_x - 0.0) * 1000.0;
+
+            // Current viewport size in pixels -> world size of one pixel
+            GLint vp[4];
+            glGetIntegerv(GL_VIEWPORT, vp);
+            const double px_x = (2.0 * hx) / vp[2]; // metres per pixel in X
+            const double px_z = (2.0 * hz) / vp[3]; // metres per pixel in Z
+
+            // Row 60 px below the top edge of the view
+            const double z_top = v.flip_z ? (v.cz - hz) : (v.cz + hz);
+            const double dir = v.flip_z ? 1.0 : -1.0; // "downward on screen" in world Z
+            const double row = z_top + dir * 60.0 * px_z;
+            const double tick = 6.0 * px_z;
+
+            // Line with small end ticks
+            glLineWidth(2.0f);
+            glColor3f(1.0f, 1.0f, 1.0f);
+            glBegin(GL_LINES);
+            glVertex2d(0.0, row);
+            glVertex2d(mid_x, row);
+            glVertex2d(0.0, row - tick);
+            glVertex2d(0.0, row + tick);
+            glVertex2d(mid_x, row - tick);
+            glVertex2d(mid_x, row + tick);
+            glEnd();
+            glLineWidth(1.0f);
+
+            // Error text centred above the line (8x13 font = 8 px per char)
+            char err_txt[64];
+            std::snprintf(err_txt, sizeof(err_txt), "error %.2f mm", error_mm);
+            const double text_w = std::strlen(err_txt) * 8.0 * px_x;
+            const double tx = 0.5 * mid_x - 0.5 * text_w;
+            const double ty = row - dir * 10.0 * px_z; // 10 px above the line
+            glRasterPos2d(tx, ty);
+            for (const char *c = err_txt; *c; ++c)
+                glutBitmapCharacter(GLUT_BITMAP_8_BY_13, *c);
+        }
+
+        glLineWidth(1.0f);
+        glColor4f(0.0f, 0.8f, 1.0f, 0.35f);
+        glBegin(GL_LINES);
+        glVertex2d(v.cx - hx, edges.baseline_z);
+        glVertex2d(v.cx + hx, edges.baseline_z);
+        glEnd();
+    }
+
     // 7. Text overlay in pixel coordinates
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
@@ -392,14 +566,14 @@ void Display()
     std::snprintf(buf, sizeof(buf), "seq %llu   points %zu (valid %u)   rx %.1f Hz   drops %llu   encoder %.2f mm%s",
                   (unsigned long long)v.seq, v.pts.size(), valid_count, v.rx_hz,
                   (unsigned long long)v.drops, v.encoder_mm, v.paused ? "   [PAUSED]" : "");
-    DrawText(10, y, buf);
+    // DrawText(10, y, buf);
     y -= 18;
 
     if (valid_count > 0)
     {
         std::snprintf(buf, sizeof(buf), "X [%.2f .. %.2f] mm   Z [%.2f .. %.2f] mm   grid %.2f mm",
                       minx * 1000, maxx * 1000, minz * 1000, maxz * 1000, step * 1000);
-        DrawText(10, y, buf);
+        // DrawText(10, y, buf);
         y -= 18;
     }
 
@@ -408,7 +582,7 @@ void Display()
         double mx, mz;
         ScreenToWorld(v.mouse_x, v.mouse_y, mx, mz);
         std::snprintf(buf, sizeof(buf), "cursor  x=%.2f mm  z=%.2f mm", mx * 1000, mz * 1000);
-        DrawText(10, y, buf);
+        // DrawText(10, y, buf);
     }
 
     glColor3f(0.6f, 0.6f, 0.66f);
@@ -417,7 +591,7 @@ void Display()
                   v.autoscale ? "on" : "off", v.connect ? "on" : "off",
                   v.color_by_intensity ? "on" : "off", v.flip_z ? "on" : "off",
                   v.show_invalid ? "on" : "off");
-    DrawText(10, 10, buf, GLUT_BITMAP_8_BY_13);
+    // DrawText(10, 10, buf, GLUT_BITMAP_8_BY_13);
 
     glutSwapBuffers();
 }
@@ -465,17 +639,34 @@ void Keyboard(unsigned char key, int, int)
     case 27:
         Shutdown();
         break;
-    case 'a': v.autoscale = !v.autoscale; break;
-    case 'c': v.connect = !v.connect; break;
-    case 'i': v.color_by_intensity = !v.color_by_intensity; break;
-    case 'f': v.flip_z = !v.flip_z; break;
-    case 'v': v.show_invalid = !v.show_invalid; break;
+    case 'a':
+        v.autoscale = !v.autoscale;
+        break;
+    case 'c':
+        v.connect = !v.connect;
+        break;
+    case 'i':
+        v.color_by_intensity = !v.color_by_intensity;
+        break;
+    case 'f':
+        v.flip_z = !v.flip_z;
+        break;
+    case 'v':
+        v.show_invalid = !v.show_invalid;
+        break;
     case ' ':
-    case 'p': v.paused = !v.paused; break;
+    case 'p':
+        v.paused = !v.paused;
+        break;
     case '+':
-    case '=': v.point_size = std::min(20.0f, v.point_size + 1.0f); break;
-    case '-': v.point_size = std::max(1.0f, v.point_size - 1.0f); break;
-    default: break;
+    case '=':
+        v.point_size = std::min(20.0f, v.point_size + 1.0f);
+        break;
+    case '-':
+        v.point_size = std::max(1.0f, v.point_size - 1.0f);
+        break;
+    default:
+        break;
     }
     glutPostRedisplay();
 }
@@ -543,8 +734,7 @@ int main(int argc, char **argv)
                 {
                     running = false;
                     if (g_i2w_thread.joinable())
-                        g_i2w_thread.join();
-                });
+                        g_i2w_thread.join(); });
 
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
