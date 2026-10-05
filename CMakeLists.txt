@@ -39,6 +39,10 @@ add_subdirectory(
     "${CMAKE_CURRENT_BINARY_DIR}/crawler_i2w_msgs"
 )
 
+find_package(OpenGL REQUIRED)
+find_package(GLUT REQUIRED)
+find_package(Threads REQUIRED)
+
 
 # ============================================================
 # Common function for test nodes
@@ -64,6 +68,10 @@ function(add_test_node TARGET_NAME SOURCE_FILE)
         PRIVATE
         i2w::i2w
         crawler_i2w_msgs::crawler_i2w_msgs
+        OpenGL::GL 
+        OpenGL::GLU 
+        GLUT::GLUT 
+        Threads::Threads
     )
 
     install(TARGETS ${TARGET_NAME}
@@ -197,3 +205,10 @@ add_test_node(
     i2wServiceCaller_node
     src/i2wServiceCaller.cpp
 )
+
+
+add_test_node(
+    laserProflingSensor_node
+    src/laserProflingSensor.cpp
+)
+
