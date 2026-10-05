@@ -212,3 +212,9 @@ add_test_node(
     src/laserProflingSensor.cpp
 )
 
+
+add_test_node(
+    laserProfilingSensorLocalTONetwork_node
+    src/laserProfilingSensorLocalTONetwork.cpp
+)
+
