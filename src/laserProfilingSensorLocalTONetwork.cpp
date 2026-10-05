@@ -57,7 +57,10 @@ private:
         }
         publisher_ = std::move(publisher.value());
 
-        auto edge_publisher = runtime().advertise<crawler_i2w_msgs::edge_status>("/edge_status", pub_opts);
+        i2w::PublisherOptions edge_publisher_opts;
+        edge_publisher_opts.plane = i2w::EndpointPlane::Local;
+
+        auto edge_publisher = runtime().advertise<crawler_i2w_msgs::edge_status>("/edge_status", edge_publisher_opts);
         if (!edge_publisher)
         {
             std::fprintf(stderr, "Failed to advertise Edge Publisher :\n");
@@ -169,7 +172,7 @@ int main()
 
     i2w::Config i2w_config;
     i2w_config.node_name = "ltn";
-    i2w_config.ns = "/scan_control";
+    i2w_config.ns = "";
     i2w_config.transport.network_profile_file = "/home/octo/TriDristi-ws/src/TriDrishti-TestNode/config/ecal-network-udp.yaml";
 
     LaserProfilingSensor lps(i2w_config);
