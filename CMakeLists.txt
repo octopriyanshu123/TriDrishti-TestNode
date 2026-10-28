@@ -218,3 +218,9 @@ add_test_node(
     src/laserProfilingSensorLocalTONetwork.cpp
 )
 
+
+add_test_node(
+    joy_logicTech_node
+    src/joy_logicTech.cpp
+)
+
